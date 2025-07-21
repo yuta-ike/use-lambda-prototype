@@ -1,108 +1,58 @@
-# use-lambda
+# use-lambda-prototype
 
-Node.js + Lambda のハイブリッドアプリケーション
+lambda のようなインフラ情報をコードに埋め込むフレームワークのプロトタイプです。
 
-## 概要
+`"use lambda"` をファイルの先頭に書くと、そのファイルで export されている関数は、Lambda 関数として実行されます。
 
-このプロジェクトは、Node.js サーバーアプリケーションと AWS Lambda 関数を組み合わせたハイブリッドな構成です。開発時は LocalStack を使用してローカル環境で AWS サービスをエミュレートします。
+以下の例の場合、たし算の処理が Lambda 関数として実行されます。
 
-## 構成
-
-- **Node.js サーバー**: Fastify を使用した Web サーバー（ポート 3000）
-- **Lambda 関数**: "use lambda" ディレクティブで指定された関数を自動的に Lambda としてデプロイ
-- **LocalStack**: AWS サービスのローカルエミュレーション
-
-## 使用方法
-
-### 開発環境の起動
-
-```bash
-# Docker Compose でサービスを起動
-pnpm run docker:up
-
-# ログを確認
-pnpm run docker:logs
-
-# サービスを停止
-pnpm run docker:down
-```
-
-### 手動ビルド
-
-```bash
-# サーバー用ビルド
-pnpm run build:app
-
-# Lambda 用ビルド
-pnpm run build:lambda
-```
-
-### Lambda 関数の手動デプロイ
-
-```bash
-# Lambda関数を手動でデプロイ（LocalStackが起動している状態で）
-pnpm run lambda:deploy
-```
-
-## アクセス先
-
-- **Web サーバー**: http://localhost:3000
-- **LocalStack**: http://localhost:4566
-- **LocalStack UI**: http://localhost:4566/\_localstack/cockpit
-
-## ディレクトリ構造
-
-```
-├── dist/
-│   ├── server/       # Node.js サーバーのビルド結果
-│   └── lambda/       # Lambda 関数のビルド結果
-├── src/
-│   ├── index.ts      # メインのサーバーアプリケーション
-│   └── actions.ts    # アクション定義
-├── scripts/
-│   └── deploy-lambda.sh  # Lambda デプロイスクリプト
-├── volume/           # LocalStack のデータ永続化
-├── Dockerfile        # アプリケーション用 Docker イメージ
-└── compose.yml       # Docker Compose 設定
-```
-
-## Lambda 関数の作成
-
-`"use lambda"` ディレクティブを使用して Lambda 関数を作成できます：
-
-```typescript
+```ts
+// src/action.ts
 "use lambda";
+export const calcAddition = (a: number, b: number): number => {
+  return a + b;
+};
 
-export function myLambdaFunction(event: any) {
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: "Hello from Lambda!" }),
-  };
-}
+// src/route.ts
+import { calcAddition } from "./action";
+
+app.post("/add", (req, res) => {
+  const { a, b } = req.body;
+  const result = calcAddition(a, b);
+  res.json({ result });
+});
 ```
 
-この関数は自動的に LocalStack の Lambda にデプロイされます。
-
-## トラブルシューティング
-
-### LocalStack が起動しない場合
+## 実行
 
 ```bash
-docker-compose down
-docker-compose up -d localstack
+pnpm install
+
+# ビルドして Lambda 関数をデプロイ
+pnpm build:app && pnpm build:lambda && ./scripts/deploy-lambda.sh
+
+# localstack を起動
+docker compose up -d
+
+# ローカルで Node.js アプリケーションを起動
+pnpm start
+
+# リクエストを送信
+curl -X POST http://localhost:3000/add -H "Content-Type: application/json" -d '{"a": 1, "b": 2}'
 ```
 
-### Lambda 関数のデプロイに失敗する場合
+## 仕組み
 
-```bash
-# Lambda関数を再デプロイ
-pnpm run lambda:deploy
-```
+Rolldown plugin として実現されています。
 
-### コンテナを完全にリセットしたい場合
+ビルドは、Node.js アプリのビルド、Lambda 関数のビルドの 2 フェーズに分かれています。Node.js アプリのビルドでは、`"use lambda"` を検出して、Lambda 関数として実行される関数を抽出します。抽出された関数は、Lambda 関数を Invoke する実装に差し替えられます。
 
-```bash
-docker-compose down -v
-docker system prune -f
-pnpm run docker:up
-```
+Lambda 関数のビルドでは、抽出された関数が Lambda 関数として実行されるように、必要なエントリポイントなどのコードが追加されます。
+
+## 制約
+
+- 入力として JSON.stringify できない値を受け取ることはできません。
+- 出力として JSON.stringify できない値を返すことはできません。
+- 同名の Lambda 関数が複数存在する場合に対応していません。
+- インライン形式の "use lambda" はサポートしていません。
+- Lambda 関数は同期的に呼び出されます。

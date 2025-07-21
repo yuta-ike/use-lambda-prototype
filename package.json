@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm run /dev:.+/ ",
-    "dev:serve": "node --watch dist/index.js",
-    "dev:build": "rolldown build --watch --config ./rolldown.config.ts",
     "start": "node --env-file .env dist/server/index.js",
     "build:app": "rolldown build --config ./rolldown.config.ts",
     "build:lambda": "rolldown build --config ./rolldown-lambda.config.ts"
