@@ -7,13 +7,13 @@ lambda のようなインフラ情報をコードに埋め込むフレームワ�
 以下の例の場合、たし算の処理が Lambda 関数として実行されます。
 
 ```ts
-// src/action.ts
+// src/action.ts （Lambda関数で実行される）
 "use lambda";
 export const calcAddition = (a: number, b: number): number => {
   return a + b;
 };
 
-// src/route.ts
+// src/route.ts （コンテナアプリケーションで実行される）
 import { calcAddition } from "./action";
 
 app.post("/add", (req, res) => {
